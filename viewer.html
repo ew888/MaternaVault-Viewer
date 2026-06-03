@@ -7,75 +7,246 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
     <style>
         :root { --primary: #6C63FF; --background: #F4F7FE; --surface: #FFFFFF; --text-main: #2B3674; --text-muted: #A3AED0; --border: #E0E5F2; --radius: 20px; }
-        body { font-family: 'Inter', sans-serif; background-color: var(--background); color: var(--text-main); margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-        .container { width: 100%; max-width: 480px; padding: 24px; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background-color: var(--background); color: var(--text-main); margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; overflow: hidden; }
+        
+        /* Main App Container */
+        .container { width: 100%; max-width: 480px; padding: 24px; box-sizing: border-box; transition: filter 0.3s ease; }
+        .blurred { filter: blur(12px) grayscale(50%); pointer-events: none; user-select: none; }
+        
         .card { background-color: var(--surface); border-radius: var(--radius); padding: 32px 24px; box-shadow: 0 18px 40px rgba(112, 144, 176, 0.12); position: relative; overflow: hidden; }
         .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 6px; background: linear-gradient(90deg, var(--primary) 0%, #9D96FF 100%); }
         .header { text-align: center; margin-bottom: 32px; }
         .title { font-family: 'Outfit', sans-serif; font-size: 28px; font-weight: 700; margin: 0 0 8px 0; }
         .subtitle { font-size: 14px; color: var(--text-muted); margin: 0; }
+        
         .data-list { list-style: none; padding: 0; margin: 0; }
         .data-item { display: flex; justify-content: space-between; align-items: center; padding: 16px 0; border-bottom: 1px solid var(--border); }
         .data-item:last-child { border-bottom: none; }
         .label { font-weight: 500; color: var(--text-muted); font-size: 14px; }
         .value { font-weight: 700; color: var(--text-main); font-size: 15px; text-align: right; }
-        .error { color: #E74C3C; font-weight: bold; text-align: center; margin-top: 20px; }
+        
+        /* PIN Overlay */
+        .pin-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; background: rgba(255, 255, 255, 0.2); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 100; transition: opacity 0.4s ease; }
+        .pin-overlay.hidden { opacity: 0; pointer-events: none; }
+        .pin-card { background: white; padding: 40px 30px; border-radius: 24px; box-shadow: 0 24px 60px rgba(0,0,0,0.15); text-align: center; max-width: 320px; width: 90%; }
+        .pin-title { font-family: 'Outfit', sans-serif; font-size: 24px; font-weight: 700; color: var(--text-main); margin: 0 0 12px 0; }
+        .pin-desc { font-size: 14px; color: var(--text-muted); margin: 0 0 24px 0; line-height: 1.5; }
+        
+        .pin-display { display: flex; justify-content: center; gap: 12px; margin-bottom: 32px; }
+        .pin-dot { width: 16px; height: 16px; border-radius: 50%; background: var(--border); transition: all 0.2s ease; }
+        .pin-dot.filled { background: var(--primary); transform: scale(1.2); }
+        .pin-dot.error { background: #E74C3C; animation: shake 0.4s ease-in-out; }
+        
+        .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+        .key { aspect-ratio: 1; border-radius: 50%; background: #F8F9FA; border: none; font-size: 24px; font-weight: 600; color: var(--text-main); cursor: pointer; display: flex; justify-content: center; align-items: center; transition: all 0.1s ease; font-family: 'Outfit', sans-serif; }
+        .key:active { background: #E9ECEF; transform: scale(0.95); }
+        .key.action { font-size: 16px; background: transparent; color: var(--text-muted); }
+        
+        .error-text { color: #E74C3C; font-size: 14px; font-weight: 600; margin-top: 16px; opacity: 0; transition: opacity 0.2s; }
+        .error-text.visible { opacity: 1; }
+
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
     </style>
 </head>
 <body>
-<div class="container">
+
+<!-- Background Blurred App -->
+<div class="container blurred" id="appContainer">
     <div class="card">
         <div class="header">
             <h1 class="title">Medical Record</h1>
-            <p class="subtitle">Securely transferred via Encrypted QR</p>
+            <p class="subtitle">Securely Decrypted (AES-GCM)</p>
         </div>
         <ul class="data-list" id="dataList">
             <!-- Data will be injected here via Javascript -->
         </ul>
-        <div id="errorMsg" class="error"></div>
+    </div>
+</div>
+
+<!-- PIN Entry Overlay -->
+<div class="pin-overlay" id="pinOverlay">
+    <div class="pin-card">
+        <h2 class="pin-title">Encrypted Record</h2>
+        <p class="pin-desc">This data is secured with AES-256. Enter the 4-digit PIN provided by the sender.</p>
+        
+        <div class="pin-display" id="pinDisplay">
+            <div class="pin-dot"></div>
+            <div class="pin-dot"></div>
+            <div class="pin-dot"></div>
+            <div class="pin-dot"></div>
+        </div>
+        
+        <div class="keypad">
+            <button class="key" onclick="press('1')">1</button>
+            <button class="key" onclick="press('2')">2</button>
+            <button class="key" onclick="press('3')">3</button>
+            <button class="key" onclick="press('4')">4</button>
+            <button class="key" onclick="press('5')">5</button>
+            <button class="key" onclick="press('6')">6</button>
+            <button class="key" onclick="press('7')">7</button>
+            <button class="key" onclick="press('8')">8</button>
+            <button class="key" onclick="press('9')">9</button>
+            <button class="key action" onclick="clearPin()">CLEAR</button>
+            <button class="key" onclick="press('0')">0</button>
+            <button class="key action" onclick="deletePin()">DEL</button>
+        </div>
+        
+        <div class="error-text" id="errorText">Incorrect PIN. Try again.</div>
     </div>
 </div>
 
 <script>
-    document.addEventListener("DOMContentLoaded", () => {
-        try {
-            // Get data from hash (e.g. #data=eyJOYW...)
-            const hash = window.location.hash;
-            if (!hash || !hash.startsWith('#data=')) {
-                throw new Error("No secure data found in the URL. Please scan the QR code again.");
-            }
+    let currentPin = '';
+    const MAX_PIN = 4;
+    
+    // Extracted from URL
+    let encryptedDataBase64 = '';
+    let urlKey = '';
 
-            const base64Data = hash.substring(6); // remove '#data='
-            
-            // Decode Base64 and parse JSON safely
-            // atob() decodes Base64, decodeURIComponent(escape()) handles UTF-8 characters safely.
-            const jsonString = decodeURIComponent(escape(atob(base64Data)));
-            const data = JSON.parse(jsonString);
-
-            const list = document.getElementById('dataList');
-            
-            for (const [key, value] of Object.entries(data)) {
-                const li = document.createElement('li');
-                li.className = 'data-item';
-                
-                const spanLabel = document.createElement('span');
-                spanLabel.className = 'label';
-                spanLabel.innerText = key;
-                
-                const spanValue = document.createElement('span');
-                spanValue.className = 'value';
-                spanValue.innerText = value;
-                
-                li.appendChild(spanLabel);
-                li.appendChild(spanValue);
-                list.appendChild(li);
-            }
-
-        } catch (e) {
-            document.getElementById('errorMsg').innerText = e.message || "Failed to decode medical record.";
-            console.error(e);
+    // Convert Base64 to Uint8Array
+    function base64ToArrayBuffer(base64) {
+        var binary_string = window.atob(base64);
+        var len = binary_string.length;
+        var bytes = new Uint8Array(len);
+        for (var i = 0; i < len; i++) {
+            bytes[i] = binary_string.charCodeAt(i);
         }
-    });
+        return bytes;
+    }
+
+    async function init() {
+        try {
+            // URL Format: #data=[base64_iv_and_ciphertext]&key=[urlKey]
+            const hash = window.location.hash.substring(1);
+            if (!hash) throw new Error("No data found.");
+            
+            const params = new URLSearchParams(hash);
+            encryptedDataBase64 = params.get('data');
+            urlKey = params.get('key');
+            
+            if (!encryptedDataBase64 || !urlKey) {
+                showFatalError("Invalid secure link format.");
+            }
+        } catch (e) {
+            showFatalError("Could not parse secure link. Please scan again.");
+        }
+    }
+
+    function updatePinDisplay(isError = false) {
+        const dots = document.querySelectorAll('.pin-dot');
+        dots.forEach((dot, index) => {
+            if (isError) {
+                dot.classList.add('error');
+            } else {
+                dot.classList.remove('error');
+                if (index < currentPin.length) {
+                    dot.classList.add('filled');
+                } else {
+                    dot.classList.remove('filled');
+                }
+            }
+        });
+        
+        if (isError) {
+            setTimeout(() => {
+                dots.forEach(dot => dot.classList.remove('error'));
+                currentPin = '';
+                updatePinDisplay();
+            }, 500);
+        }
+    }
+
+    async function press(digit) {
+        document.getElementById('errorText').classList.remove('visible');
+        if (currentPin.length < MAX_PIN) {
+            currentPin += digit;
+            updatePinDisplay();
+            
+            if (currentPin.length === MAX_PIN) {
+                await attemptDecryption(currentPin);
+            }
+        }
+    }
+
+    function deletePin() {
+        if (currentPin.length > 0) {
+            currentPin = currentPin.slice(0, -1);
+            updatePinDisplay();
+        }
+    }
+    
+    function clearPin() {
+        currentPin = '';
+        updatePinDisplay();
+    }
+
+    async function attemptDecryption(pin) {
+        try {
+            // 1. Derive AES Key: SHA-256(urlKey + PIN)
+            const rawMaterial = new TextEncoder().encode(urlKey + pin);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', rawMaterial);
+            
+            // 2. Import Key for AES-GCM
+            const cryptoKey = await crypto.subtle.importKey(
+                'raw',
+                hashBuffer,
+                { name: 'AES-GCM' },
+                false,
+                ['decrypt']
+            );
+            
+            // 3. Prepare Encrypted Data
+            // Format: first 12 bytes = IV, remaining bytes = Ciphertext
+            const fullData = base64ToArrayBuffer(encryptedDataBase64);
+            if (fullData.length < 12) throw new Error("Data too short");
+            
+            const iv = fullData.slice(0, 12);
+            const ciphertext = fullData.slice(12);
+            
+            // 4. Decrypt
+            const decryptedBuffer = await crypto.subtle.decrypt(
+                { name: 'AES-GCM', iv: iv },
+                cryptoKey,
+                ciphertext
+            );
+            
+            // 5. Decode JSON and Render
+            const jsonString = new TextDecoder().decode(decryptedBuffer);
+            const data = JSON.parse(jsonString);
+            
+            renderData(data);
+            
+            // Hide Overlay, Unblur Background
+            document.getElementById('pinOverlay').classList.add('hidden');
+            document.getElementById('appContainer').classList.remove('blurred');
+            
+        } catch (e) {
+            // Decryption failed (Wrong PIN or corrupted data)
+            console.error("Decryption failed", e);
+            document.getElementById('errorText').classList.add('visible');
+            updatePinDisplay(true); // show error shake
+        }
+    }
+
+    function renderData(data) {
+        const list = document.getElementById('dataList');
+        list.innerHTML = '';
+        for (const [key, value] of Object.entries(data)) {
+            const li = document.createElement('li');
+            li.className = 'data-item';
+            li.innerHTML = `<span class="label">${key}</span><span class="value">${value}</span>`;
+            list.appendChild(li);
+        }
+    }
+
+    function showFatalError(msg) {
+        document.querySelector('.pin-desc').innerText = msg;
+        document.querySelector('.keypad').style.display = 'none';
+        document.getElementById('pinDisplay').style.display = 'none';
+    }
+
+    // Start
+    init();
 </script>
 </body>
 </html>
