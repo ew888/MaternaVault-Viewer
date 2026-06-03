@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MaternaVault Viewer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary: #6C63FF; --background: #F4F7FE; --surface: #FFFFFF; --text-main: #2B3674; --text-muted: #A3AED0; --border: #E0E5F2; --radius: 20px; }
+        body { font-family: 'Inter', sans-serif; background-color: var(--background); color: var(--text-main); margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .container { width: 100%; max-width: 480px; padding: 24px; box-sizing: border-box; }
+        .card { background-color: var(--surface); border-radius: var(--radius); padding: 32px 24px; box-shadow: 0 18px 40px rgba(112, 144, 176, 0.12); position: relative; overflow: hidden; }
+        .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 6px; background: linear-gradient(90deg, var(--primary) 0%, #9D96FF 100%); }
+        .header { text-align: center; margin-bottom: 32px; }
+        .title { font-family: 'Outfit', sans-serif; font-size: 28px; font-weight: 700; margin: 0 0 8px 0; }
+        .subtitle { font-size: 14px; color: var(--text-muted); margin: 0; }
+        .data-list { list-style: none; padding: 0; margin: 0; }
+        .data-item { display: flex; justify-content: space-between; align-items: center; padding: 16px 0; border-bottom: 1px solid var(--border); }
+        .data-item:last-child { border-bottom: none; }
+        .label { font-weight: 500; color: var(--text-muted); font-size: 14px; }
+        .value { font-weight: 700; color: var(--text-main); font-size: 15px; text-align: right; }
+        .error { color: #E74C3C; font-weight: bold; text-align: center; margin-top: 20px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="card">
+        <div class="header">
+            <h1 class="title">Medical Record</h1>
+            <p class="subtitle">Securely transferred via Encrypted QR</p>
+        </div>
+        <ul class="data-list" id="dataList">
+            <!-- Data will be injected here via Javascript -->
+        </ul>
+        <div id="errorMsg" class="error"></div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        try {
+            // Get data from hash (e.g. #data=eyJOYW...)
+            const hash = window.location.hash;
+            if (!hash || !hash.startsWith('#data=')) {
+                throw new Error("No secure data found in the URL. Please scan the QR code again.");
+            }
+
+            const base64Data = hash.substring(6); // remove '#data='
+            
+            // Decode Base64 and parse JSON safely
+            // atob() decodes Base64, decodeURIComponent(escape()) handles UTF-8 characters safely.
+            const jsonString = decodeURIComponent(escape(atob(base64Data)));
+            const data = JSON.parse(jsonString);
+
+            const list = document.getElementById('dataList');
+            
+            for (const [key, value] of Object.entries(data)) {
+                const li = document.createElement('li');
+                li.className = 'data-item';
+                
+                const spanLabel = document.createElement('span');
+                spanLabel.className = 'label';
+                spanLabel.innerText = key;
+                
+                const spanValue = document.createElement('span');
+                spanValue.className = 'value';
+                spanValue.innerText = value;
+                
+                li.appendChild(spanLabel);
+                li.appendChild(spanValue);
+                list.appendChild(li);
+            }
+
+        } catch (e) {
+            document.getElementById('errorMsg').innerText = e.message || "Failed to decode medical record.";
+            console.error(e);
+        }
+    });
+</script>
+</body>
+</html>
