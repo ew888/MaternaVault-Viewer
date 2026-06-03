@@ -127,6 +127,9 @@
             if (!encryptedDataBase64 || !urlKey) {
                 showFatalError("Invalid secure link format.");
             }
+            
+            // Self-Destructing Web State: scrub the URL immediately after loading to RAM
+            window.history.replaceState(null, null, window.location.pathname);
         } catch (e) {
             showFatalError("Could not parse secure link. Please scan again.");
         }
